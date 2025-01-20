@@ -1,10 +1,39 @@
+import { Route } from '@/types';
 import got from '@/utils/got';
 import { load } from 'cheerio';
 import queryString from 'query-string';
 import { parseDate } from '@/utils/parse-date';
 import sanitizeHtml from 'sanitize-html';
+import { parseToken } from '@/routes/xueqiu/cookies';
 
-export default async (ctx) => {
+export const route: Route = {
+    path: '/stock_info/:id/:type?',
+    categories: ['finance'],
+    example: '/xueqiu/stock_info/SZ000002',
+    parameters: { id: '股票代码（需要带上交易所）', type: '动态的类型, 不填则为股票公告' },
+    features: {
+        requireConfig: false,
+        requirePuppeteer: false,
+        antiCrawler: false,
+        supportBT: false,
+        supportPodcast: false,
+        supportScihub: false,
+    },
+    radar: [
+        {
+            source: ['xueqiu.com/S/:id', 'xueqiu.com/s/:id'],
+            target: '/stock_info/:id',
+        },
+    ],
+    name: '股票信息',
+    maintainers: ['YuYang'],
+    handler,
+    description: `| 公告         | 新闻 | 研报     |
+  | ------------ | ---- | -------- |
+  | announcement | news | research |`,
+};
+
+async function handler(ctx) {
     const id = ctx.req.param('id');
     const type = ctx.req.param('type') || 'announcement';
     const count = 10;
@@ -17,12 +46,13 @@ export default async (ctx) => {
     };
     const source = typename[type];
 
+    const link = `https://xueqiu.com/S/${id}`;
     const res1 = await got({
         method: 'get',
-        url: `https://xueqiu.com/S/${id}`,
+        url: link,
     });
-    const token = res1.headers['set-cookie'].find((s) => s.startsWith('xq_a_token=')).split(';')[0];
 
+    const token = await parseToken(link);
     const $ = load(res1.data); // 使用 cheerio 加载返回的 HTML
     const stock_name = $('.stock-name').text().split('(')[0];
 
@@ -44,26 +74,20 @@ export default async (ctx) => {
         }),
         headers: {
             Cookie: token,
-            Referer: `https://xueqiu.com/u/${id}`,
+            Referer: link,
         },
     });
 
     const data = res2.data.list;
-    ctx.set('data', {
+    return {
         title: `${id} ${stock_name} - ${source}`,
-        link: `https://xueqiu.com/S/${id}`,
+        link,
         description: `${stock_name} - ${source}`,
-        item: data.map((item) => {
-            let link = `https://xueqiu.com${item.target}`;
-            if (item.quote_cards) {
-                link = item.quote_cards[0].target_url;
-            }
-            return {
-                title: item.title || sanitizeHtml(item.description, { allowedTags: [], allowedAttributes: {} }),
-                description: item.description,
-                pubDate: parseDate(item.created_at),
-                link,
-            };
-        }),
-    });
-};
+        item: data.map((item) => ({
+            title: item.title || sanitizeHtml(item.description, { allowedTags: [], allowedAttributes: {} }),
+            description: item.description,
+            pubDate: parseDate(item.created_at),
+            link: `https://xueqiu.com${item.target}`,
+        })),
+    };
+}

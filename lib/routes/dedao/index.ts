@@ -1,9 +1,23 @@
+import { Route } from '@/types';
 import cache from '@/utils/cache';
 import got from '@/utils/got';
 import { load } from 'cheerio';
 import { parseDate } from '@/utils/parse-date';
 
-export default async (ctx) => {
+export const route: Route = {
+    path: '/:category?',
+    name: '文章',
+    maintainers: ['nczitzk', 'pseudoyu'],
+    categories: ['new-media', 'popular'],
+    example: '/dedao',
+    parameters: { category: '分类，见下表，默认为`news`' },
+    description: `| 新闻 | 人物故事 | 视频 |
+  | ---- | ---- | ---- |
+  | news | figure | video |`,
+    handler,
+};
+
+async function handler(ctx) {
     const category = ctx.req.param('category') ?? 'news';
 
     const rootUrl = `https://www.igetget.com/${category === 'video' ? 'video' : 'news'}`;
@@ -38,10 +52,10 @@ export default async (ctx) => {
         )
     );
 
-    ctx.set('data', {
+    return {
         title: `得到${category === 'video' ? '' : '大事件'} - ${category === 'news' ? '新闻' : category === 'figure' ? '人物故事' : '视频'}`,
         link: rootUrl,
         item: items,
         description: data.description,
-    });
-};
+    };
+}

@@ -1,6 +1,7 @@
+import { Route } from '@/types';
 import { getSubPath } from '@/utils/common-utils';
 import cache from '@/utils/cache';
-import got from '@/utils/got';
+import ofetch from '@/utils/ofetch';
 import { parseDate } from '@/utils/parse-date';
 import timezone from '@/utils/timezone';
 
@@ -19,7 +20,14 @@ const mapping = {
     },
 };
 
-export default async (ctx) => {
+export const route: Route = {
+    path: '/beijing/bphc/*',
+    name: 'Unknown',
+    maintainers: [],
+    handler,
+};
+
+async function handler(ctx) {
     const rootUrl = 'https://gycpt.bphc.com.cn';
     const defaultPath = 'announcement';
 
@@ -28,13 +36,13 @@ export default async (ctx) => {
     const obj = mapping[key];
     const currentUrl = `${rootUrl}${obj.list}`;
 
-    const listResp = await got(currentUrl).json();
+    const listResp = await ofetch(currentUrl);
     const list = listResp.data?.records ?? [];
     const items = await Promise.all(
         list.map((item) => {
             const detail = `${rootUrl}${obj.detail}/${item.id}`;
             return cache.tryGet(detail, async () => {
-                const detailResponse = await got(detail).json();
+                const detailResponse = await ofetch(detail);
                 const description = (detailResponse.data?.content || detailResponse.data?.introduction) ?? '';
                 const single = {
                     title: item.title || item.fullName,
@@ -48,9 +56,9 @@ export default async (ctx) => {
         })
     );
 
-    ctx.set('data', {
+    return {
         title: obj.title,
         link: rootUrl,
         item: items,
-    });
-};
+    };
+}

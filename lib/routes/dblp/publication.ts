@@ -1,8 +1,32 @@
+import { Route } from '@/types';
 // 导入所需模组
-import got from '@/utils/got'; // 自订的 got
+import ofetch from '@/utils/ofetch';
 // import { parseDate } from '@/utils/parse-date';
 
-export default async (ctx) => {
+export const route: Route = {
+    path: '/:field',
+    categories: ['study'],
+    example: '/dblp/knowledge%20tracing',
+    parameters: { field: 'Research field' },
+    features: {
+        requireConfig: false,
+        requirePuppeteer: false,
+        antiCrawler: false,
+        supportBT: false,
+        supportPodcast: false,
+        supportScihub: false,
+    },
+    radar: [
+        {
+            source: ['dblp.org/:field'],
+        },
+    ],
+    name: 'Keyword Search',
+    maintainers: ['ytno1'],
+    handler,
+};
+
+async function handler(ctx) {
     // 在此处编写您的逻辑
     const field = ctx.req.param('field');
 
@@ -11,10 +35,8 @@ export default async (ctx) => {
         result: {
             hits: { hit: data },
         },
-    } = await got({
-        method: 'get',
-        url: 'https://dblp.org/search/publ/api',
-        searchParams: {
+    } = await ofetch('https://dblp.org/search/publ/api', {
+        query: {
             q: field,
             format: 'json',
             h: 10,
@@ -22,7 +44,7 @@ export default async (ctx) => {
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
         },
-    }).json();
+    });
 
     // console.log(data);
 
@@ -51,7 +73,7 @@ export default async (ctx) => {
         };
     });
 
-    ctx.set('data', {
+    return {
         // 在此处输出您的 RSS
         // 源标题
         title: `【dblp】${field}`,
@@ -61,5 +83,5 @@ export default async (ctx) => {
         description: `DBLP ${field} RSS`,
         // 处理后的数据，即文章列表
         item: list,
-    });
-};
+    };
+}

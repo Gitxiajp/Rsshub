@@ -1,3 +1,4 @@
+import { Route, ViewType } from '@/types';
 import { getCurrentPath } from '@/utils/helpers';
 const __dirname = getCurrentPath(import.meta.url);
 
@@ -5,9 +6,50 @@ import cache from '@/utils/cache';
 import got from '@/utils/got';
 import { config } from '@/config';
 import { art } from '@/utils/render';
-import * as path from 'node:path';
+import path from 'node:path';
 
-export default async (ctx) => {
+export const route: Route = {
+    path: '/search/:q/:order?',
+    categories: ['picture', 'popular'],
+    view: ViewType.Pictures,
+    example: '/pixabay/search/cat',
+    parameters: {
+        q: 'Search term',
+        order: {
+            description: 'Order',
+            options: [
+                { value: 'popular', label: 'popular' },
+                { value: 'latest', label: 'latest' },
+            ],
+            default: 'latest',
+        },
+    },
+    features: {
+        requireConfig: [
+            {
+                name: 'PIXABAY_KEY',
+                optional: true,
+                description: '',
+            },
+        ],
+        requirePuppeteer: false,
+        antiCrawler: false,
+        supportBT: false,
+        supportPodcast: false,
+        supportScihub: false,
+    },
+    radar: [
+        {
+            source: ['pixabay.com/:searchType/search/:q'],
+            target: '/search/:q',
+        },
+    ],
+    name: 'Search',
+    maintainers: ['TonyRL'],
+    handler,
+};
+
+async function handler(ctx) {
     const { q, order = 'latest' } = ctx.req.param();
     const key = config.pixabay?.key ?? '7329690-bbadad6d872ba577d5a358679';
     const baseUrl = 'https://pixabay.com';
@@ -43,12 +85,12 @@ export default async (ctx) => {
         };
     });
 
-    ctx.set('data', {
+    return {
         title: `Search ${q} - Pixabay`,
         description: 'Download & use free nature stock photos in high resolution ✓ New free images everyday ✓ HD to 4K ✓ Best nature pictures for all devices on Pixabay',
         link: `${baseUrl}/images/search/${q}/${order === 'latest' ? '?order=latest' : ''}`,
         image: `https://pixabay.com/apple-touch-icon.png`,
         language: 'en',
         item: items,
-    });
-};
+    };
+}

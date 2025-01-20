@@ -1,3 +1,4 @@
+import { Route, ViewType } from '@/types';
 import got from '@/utils/got';
 import { load } from 'cheerio';
 import { parseDate } from '@/utils/parse-date';
@@ -14,13 +15,66 @@ const platforms = {
     tvos: 'appletvos',
 };
 
-export default async (ctx) => {
+export const route: Route = {
+    path: '/apps/update/:country/:id/:platform?',
+    categories: ['program-update', 'popular'],
+    view: ViewType.Notifications,
+    example: '/apple/apps/update/us/id408709785',
+    parameters: {
+        country: 'App Store Country, obtain from the app URL, see below',
+        id: 'App id, obtain from the app URL',
+        platform: {
+            description: 'App Platform, see below, all by default',
+            options: [
+                {
+                    value: 'All',
+                    label: 'all',
+                },
+                {
+                    value: 'iOS',
+                    label: 'iOS',
+                },
+                {
+                    value: 'macOS',
+                    label: 'macOS',
+                },
+                {
+                    value: 'tvOS',
+                    label: 'tvOS',
+                },
+            ],
+        },
+    },
+    features: {
+        requireConfig: false,
+        requirePuppeteer: false,
+        antiCrawler: false,
+        supportBT: false,
+        supportPodcast: false,
+        supportScihub: false,
+    },
+    radar: [
+        {
+            source: ['apps.apple.com/:country/app/:appSlug/:id', 'apps.apple.com/:country/app/:id'],
+            target: '/apps/update/:country/:id',
+        },
+    ],
+    name: 'App Update',
+    maintainers: ['EkkoG', 'nczitzk'],
+    handler,
+    description: `
+::: tip
+  For example, the URL of [GarageBand](https://apps.apple.com/us/app/messages/id408709785) in the App Store is \`https://apps.apple.com/us/app/messages/id408709785\`. In this case, the \`App Store Country\` parameter for the route is \`us\`, and the \`App id\` parameter is \`id1146560473\`. So the route should be [\`/apple/apps/update/us/id408709785\`](https://rsshub.app/apple/apps/update/us/id408709785).
+:::`,
+};
+
+async function handler(ctx) {
     const { country, id } = ctx.req.param();
     let { platform } = ctx.req.param();
 
     let platformId;
 
-    if (platform) {
+    if (platform && platform !== 'all') {
         platform = platform.toLowerCase();
         platformId = Object.hasOwn(platforms, platform) ? platforms[platform] : platform;
     }
@@ -34,8 +88,6 @@ export default async (ctx) => {
     const { data: response } = await got(currentUrl);
 
     const $ = load(response);
-
-    const subtitle = $('h2.whats-new__headline').text() || "What's New";
 
     const appData = JSON.parse(Object.values(JSON.parse($('script#shoebox-media-api-cache-apps').text()))[0]);
     const attributes = appData.d[0].attributes;
@@ -54,10 +106,10 @@ export default async (ctx) => {
         const platformAttribute = platformAttributes[platformId];
 
         items = platformAttribute.versionHistory;
-        title = `${appName}${platform ? ` for ${platform} ` : ' '}${subtitle}`;
+        title = `${appName}${platform ? ` for ${platform} ` : ' '}`;
         description = platformAttribute.description.standard;
     } else {
-        title = `${appName} ${subtitle}`;
+        title = appName;
         for (const pid of Object.keys(platformAttributes)) {
             const platformAttribute = platformAttributes[pid];
             items = [
@@ -87,9 +139,13 @@ export default async (ctx) => {
 
     const icon = new URL('favicon.ico', rootUrl).href;
 
-    ctx.set('data', {
+    ctx.set('json', {
+        appData,
+    });
+
+    return {
         item: items,
-        title,
+        title: `${title} - Apple App Store`,
         link: currentUrl,
         description: description?.replace(/\n/g, ' '),
         language: $('html').prop('lang'),
@@ -99,9 +155,5 @@ export default async (ctx) => {
         subtitle: appName,
         author: artistName,
         allowEmpty: true,
-    });
-
-    ctx.set('json', {
-        appData,
-    });
-};
+    };
+}

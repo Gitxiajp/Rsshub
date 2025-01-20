@@ -1,3 +1,4 @@
+import { Route } from '@/types';
 import { getCurrentPath } from '@/utils/helpers';
 const __dirname = getCurrentPath(import.meta.url);
 
@@ -5,9 +6,30 @@ import cache from '@/utils/cache';
 import got from '@/utils/got';
 import { parseDate } from '@/utils/parse-date';
 import { art } from '@/utils/render';
-import * as path from 'node:path';
+import path from 'node:path';
 
-export default async (ctx) => {
+export const route: Route = {
+    path: '/:type?',
+    categories: ['new-media', 'popular'],
+    example: '/mittrchina/index',
+    parameters: { type: '类型，见下表，默认为首页资讯' },
+    features: {
+        requireConfig: false,
+        requirePuppeteer: false,
+        antiCrawler: false,
+        supportBT: false,
+        supportPodcast: false,
+        supportScihub: false,
+    },
+    name: '首页',
+    maintainers: ['EsuRt', 'queensferryme'],
+    handler,
+    description: `| 快讯     | 本周热文 | 首页资讯 | 视频  |
+  | -------- | -------- | -------- | ----- |
+  | breaking | hot      | index    | video |`,
+};
+
+async function handler(ctx) {
     const typeMap = {
         breaking: {
             title: '快讯',
@@ -30,7 +52,7 @@ export default async (ctx) => {
     const { type = 'index' } = ctx.req.param();
     const limit = ctx.req.query('limit') ? Number.parseInt(ctx.req.query('limit'), 10) : 10;
 
-    const link = `https://apii.mittrchina.com${typeMap[type].apiPath}`;
+    const link = `https://apii.web.mittrchina.com${typeMap[type].apiPath}`;
     const { data: response } =
         type === 'breaking'
             ? await got.post(link, {
@@ -60,20 +82,22 @@ export default async (ctx) => {
                           type: article.address.split('.').pop(),
                       },
                   })
-                : article.summary,
-        pubDate: article.start_time ? parseDate(article.start_time, 'X') : undefined,
+                : type === 'breaking'
+                  ? article.content
+                  : article.summary,
+        pubDate: article.start_time ? parseDate(article.start_time, 'X') : article.push_time ? parseDate(article.push_time, 'X') : undefined,
         id: article.id,
         link: `https://www.mittrchina.com/news/detail/${article.id}`,
     }));
 
     let items = list;
-    if (type !== 'video') {
+    if (type !== 'video' && type !== 'breaking') {
         items = await Promise.all(
             list.map((item) =>
                 cache.tryGet(item.link, async () => {
                     const {
                         data: { data: details },
-                    } = await got(`https://apii.mittrchina.com/information/details?id=${item.id}`);
+                    } = await got(`https://apii.web.mittrchina.com/information/details?id=${item.id}`);
 
                     item.description = details.content;
 
@@ -95,9 +119,9 @@ export default async (ctx) => {
         );
     }
 
-    ctx.set('data', {
+    return {
         title: `MIT 科技评论 - ${typeMap[type].title}`,
         link: `https://www.mittrchina.com/${type}`,
         item: items,
-    });
-};
+    };
+}

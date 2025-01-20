@@ -1,10 +1,11 @@
+import { Route } from '@/types';
 import { getCurrentPath } from '@/utils/helpers';
 const __dirname = getCurrentPath(import.meta.url);
 
 import got from '@/utils/got';
 import { parseDate } from '@/utils/parse-date';
 import { art } from '@/utils/render';
-import * as path from 'node:path';
+import path from 'node:path';
 
 const titles = {
     focus: {
@@ -45,11 +46,46 @@ const titles = {
     },
 };
 
-export default async (ctx) => {
+export const route: Route = {
+    path: '/news/:category?/:language?',
+    categories: ['traditional-media'],
+    example: '/tvb/news',
+    parameters: { category: '分类，见下表，默认为要聞', language: '语言，见下表' },
+    features: {
+        requireConfig: false,
+        requirePuppeteer: false,
+        antiCrawler: false,
+        supportBT: false,
+        supportPodcast: false,
+        supportScihub: false,
+    },
+    radar: [
+        {
+            source: ['tvb.com/:language/:category', 'tvb.com/'],
+        },
+    ],
+    name: '新闻',
+    maintainers: ['nczitzk'],
+    handler,
+    description: `分类
+
+  | 要聞  | 快訊    | 港澳  | 兩岸         | 國際  | 財經    | 體育   | 法庭       | 天氣    |
+  | ----- | ------- | ----- | ------------ | ----- | ------- | ------ | ---------- | ------- |
+  | focus | instant | local | greaterchina | world | finance | sports | parliament | weather |
+
+  语言
+
+  | 繁 | 简 |
+  | -- | -- |
+  | tc | sc |`,
+};
+
+async function handler(ctx) {
     const category = ctx.req.param('category') ?? 'focus';
     const language = ctx.req.param('language') ?? 'tc';
 
     const rootUrl = 'https://inews-api.tvb.com';
+    const linkRootUrl = 'https://news.tvb.com';
     const apiUrl = `${rootUrl}/news/entry/category`;
     const currentUrl = `${rootUrl}/${language}/${category}`;
 
@@ -61,12 +97,13 @@ export default async (ctx) => {
             lang: language,
             page: 1,
             limit: ctx.req.query('limit') ?? 50,
+            country: 'HK',
         },
     });
 
     const items = response.data.content.map((item) => ({
         title: item.title,
-        link: `${rootUrl}/${language}/${category}/${item.id}`,
+        link: `${linkRootUrl}/${language}/${category}/${item.id}`,
         pubDate: parseDate(item.publish_datetime),
         category: [...item.category.map((c) => c.title), ...item.tags],
         description: art(path.join(__dirname, 'templates/description.art'), {
@@ -75,9 +112,9 @@ export default async (ctx) => {
         }),
     }));
 
-    ctx.set('data', {
+    return {
         title: `${response.data.meta.title} - ${titles[category][language]}`,
         link: currentUrl,
         item: items,
-    });
-};
+    };
+}

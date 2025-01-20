@@ -1,14 +1,19 @@
+import { Route } from '@/types';
 import cache from '@/utils/cache';
-import got from '@/utils/got';
+import ofetch from '@/utils/ofetch';
 
-export default async (ctx) => {
+export const route: Route = {
+    path: '/:type?',
+    name: 'Unknown',
+    maintainers: ['Fatpandac'],
+    handler,
+};
+
+async function handler(ctx) {
     const type = ctx.req.param('type') === 'all' ? '' : ctx.req.param('type').toUpperCase();
     const host = `https://td.zjgtjy.cn:8553/devops/noticeInfo/queryNoticeInfoList?pageSize=10&pageNumber=1&noticeType=${type}&sort=DESC`;
 
-    const response = await got({
-        method: 'get',
-        url: host,
-    }).json();
+    const response = await ofetch(host);
     const data = response.data;
 
     const items = await Promise.all(
@@ -17,10 +22,7 @@ export default async (ctx) => {
             const pageLink = `https://td.zjgtjy.cn/view/trade/announcement/detail?id=${item.GGID}&category=${item.ZYLB}&type=${item.JYFS}`;
 
             const desc = await cache.tryGet(pageUrl, async () => {
-                let desc = await got({
-                    method: 'get',
-                    url: pageUrl,
-                }).json();
+                let desc = await ofetch(pageUrl);
                 desc = desc.queryNoticeContent.GGNR;
 
                 desc = desc.replaceAll('&lt;', '<').replaceAll('&gt;', '>').replaceAll('&quot;', '"');
@@ -36,9 +38,9 @@ export default async (ctx) => {
         })
     );
 
-    ctx.set('data', {
+    return {
         title: '浙江土地使用权挂牌公告',
         link: host,
         item: items,
-    });
-};
+    };
+}

@@ -1,3 +1,4 @@
+import { Route } from '@/types';
 import { getCurrentPath } from '@/utils/helpers';
 const __dirname = getCurrentPath(import.meta.url);
 
@@ -6,7 +7,7 @@ import got from '@/utils/got';
 import { load } from 'cheerio';
 import { parseDate, parseRelativeDate } from '@/utils/parse-date';
 import { art } from '@/utils/render';
-import * as path from 'node:path';
+import path from 'node:path';
 
 const parseContent = (content) =>
     art(path.join(__dirname, 'templates/description.art'), {
@@ -15,7 +16,31 @@ const parseContent = (content) =>
 
 art.defaults.imports.parseContent = parseContent;
 
-export default async (ctx) => {
+export const route: Route = {
+    path: '/top20',
+    categories: ['blog'],
+    example: '/zhubai/top20',
+    parameters: {},
+    features: {
+        requireConfig: false,
+        requirePuppeteer: false,
+        antiCrawler: false,
+        supportBT: false,
+        supportPodcast: false,
+        supportScihub: false,
+    },
+    radar: [
+        {
+            source: ['analy.zhubai.love/'],
+        },
+    ],
+    name: '上周热门 TOP 20',
+    maintainers: ['nczitzk'],
+    handler,
+    url: 'analy.zhubai.love/',
+};
+
+async function handler(ctx) {
     const limit = ctx.req.query('limit') ? Number.parseInt(ctx.req.query('limit')) : 20;
 
     const rootUrl = 'http://analy.zhubai.wiki';
@@ -26,7 +51,7 @@ export default async (ctx) => {
 
     let items = response.data.slice(0, limit).map((item) => ({
         title: item.pn,
-        link: item.fp ?? item.pq ?? item.pu,
+        link: item.pu ?? item.pq ?? item.fp,
         description: item.pa,
         author: item.zn,
         pubDate: parseRelativeDate(item.lu.replace(/\.\d+/, '')),
@@ -35,7 +60,7 @@ export default async (ctx) => {
     items = await Promise.all(
         items.map((item) =>
             cache.tryGet(item.link, async () => {
-                const matches = item.link.match(/\/(?:fp|pq|pu)\/([\w-]+)\/(\d+)/);
+                const matches = item.link.match(/\/(?:pl|pq|fp)\/([\w-]+)\/(\d+)/);
 
                 const { data } = await got(`https://${matches[1]}.zhubai.love/api/posts/${matches[2]}`);
 
@@ -55,7 +80,7 @@ export default async (ctx) => {
 
     const icon = $('link[rel="apple-touch-icon"]').prop('href');
 
-    ctx.set('data', {
+    return {
         item: items,
         title: `${$('meta[property="og:title"]').prop('content')} - TOP20`,
         link: rootUrl,
@@ -66,5 +91,5 @@ export default async (ctx) => {
         logo: icon,
         subtitle: $('meta[property="og:description"]').prop('content'),
         author: $('meta[name="twitter:site"]').prop('content'),
-    });
-};
+    };
+}

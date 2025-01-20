@@ -1,3 +1,4 @@
+import { Route } from '@/types';
 import cache from '@/utils/cache';
 import got from '@/utils/got';
 import { parseDate } from '@/utils/parse-date';
@@ -8,10 +9,28 @@ const notFoundData = {
     title: '此 bilibili 频道不存在',
 };
 
-export default async (ctx) => {
+export const route: Route = {
+    path: '/user/channel/:uid/:sid/:embed?',
+    categories: ['social-media'],
+    example: '/bilibili/user/channel/2267573/396050',
+    parameters: { uid: '用户 id, 可在 UP 主主页中找到', sid: '频道 id, 可在频道的 URL 中找到', embed: '默认为开启内嵌视频, 任意值为关闭' },
+    features: {
+        requireConfig: false,
+        requirePuppeteer: false,
+        antiCrawler: false,
+        supportBT: false,
+        supportPodcast: false,
+        supportScihub: false,
+    },
+    name: 'UP 主频道的视频列表',
+    maintainers: ['weirongxu'],
+    handler,
+};
+
+async function handler(ctx) {
     const uid = Number.parseInt(ctx.req.param('uid'));
     const sid = Number.parseInt(ctx.req.param('sid'));
-    const disableEmbed = ctx.req.param('disableEmbed');
+    const embed = !ctx.req.param('embed');
     const limit = ctx.req.query('limit') ?? 25;
 
     const link = `https://space.bilibili.com/${uid}/channel/seriesdetail?sid=${sid}`;
@@ -29,8 +48,7 @@ export default async (ctx) => {
     });
 
     if (!channelInfo) {
-        ctx.set('data', notFoundData);
-        return;
+        return notFoundData;
     }
     const [userName, face] = await cacheIn.getUsernameAndFaceFromUID(uid);
     const host = `https://api.bilibili.com/x/series/archives?mid=${uid}&series_id=${sid}&only_normal=true&sort=desc&pn=1&ps=${limit}`;
@@ -43,29 +61,22 @@ export default async (ctx) => {
 
     const data = response.data.data;
     if (!data.archives) {
-        ctx.set('data', notFoundData);
-        return;
+        return notFoundData;
     }
 
-    ctx.set('data', {
+    return {
         title: `${userName} 的 bilibili 频道 ${channelInfo.meta.name}`,
         link,
         description: `${userName} 的 bilibili 频道`,
+        image: face,
         logo: face,
         icon: face,
-        item: data.archives.map((item) => {
-            const descList = [];
-            if (!disableEmbed) {
-                descList.push(utils.iframe(item.aid));
-            }
-            descList.push(`<img src="${item.pic}">`);
-            return {
-                title: item.title,
-                description: descList.join('<br>'),
-                pubDate: parseDate(item.pubdate, 'X'),
-                link: item.pubdate > utils.bvidTime && item.bvid ? `https://www.bilibili.com/video/${item.bvid}` : `https://www.bilibili.com/video/av${item.aid}`,
-                author: userName,
-            };
-        }),
-    });
-};
+        item: data.archives.map((item) => ({
+            title: item.title,
+            description: utils.renderUGCDescription(embed, item.pic, '', item.aid, undefined, item.bvid),
+            pubDate: parseDate(item.pubdate, 'X'),
+            link: item.pubdate > utils.bvidTime && item.bvid ? `https://www.bilibili.com/video/${item.bvid}` : `https://www.bilibili.com/video/av${item.aid}`,
+            author: userName,
+        })),
+    };
+}

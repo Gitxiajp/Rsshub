@@ -1,9 +1,31 @@
+import { Route } from '@/types';
 import cache from '@/utils/cache';
 import got from '@/utils/got';
 import { load } from 'cheerio';
 import { parseDate } from '@/utils/parse-date';
+import timezone from '@/utils/timezone';
 
-export default async (ctx) => {
+export const route: Route = {
+    path: '/global/jlpt',
+    name: '日本语能力测试(JLPT)通知',
+    url: 'jlpt.neea.edu.cn',
+    maintainers: ['nczitzk'],
+    example: '/neea/global/jlpt',
+    parameters: {},
+    categories: ['study'],
+    features: {
+        supportRadar: true,
+    },
+    radar: [
+        {
+            source: ['jlpt.neea.edu.cn', 'jlpt.neea.cn'],
+            target: '/global/jlpt',
+        },
+    ],
+    handler,
+};
+
+async function handler() {
     const rootUrl = 'https://news.neea.cn';
     const currentUrl = `${rootUrl}/JLPT/1/newslist.htm`;
 
@@ -24,7 +46,7 @@ export default async (ctx) => {
             return {
                 title: item.text(),
                 link: `${rootUrl}/JLPT/1/${item.attr('href')}`,
-                pubDate: matches ? parseDate(matches[1]) : '',
+                pubDate: matches ? timezone(parseDate(matches[1]), +8) : '',
             };
         });
 
@@ -45,9 +67,9 @@ export default async (ctx) => {
         )
     );
 
-    ctx.set('data', {
-        title: '重要通知 - 教育部考试中心日本语能力测试',
+    return {
+        title: '日本语能力测试(JLPT)通知',
         link: currentUrl,
         item: items,
-    });
-};
+    };
+}

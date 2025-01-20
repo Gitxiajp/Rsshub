@@ -1,8 +1,19 @@
+import { Route, ViewType } from '@/types';
 import got from '@/utils/got';
 import { load } from 'cheerio';
 import { parseDate } from '@/utils/parse-date';
 
-export default async (ctx) => {
+export const route: Route = {
+    path: '/html_clip/:user/:tag',
+    example: '/inoreader/html_clip/1005137674/user-favorites',
+    categories: ['reading', 'popular'],
+    view: ViewType.Articles,
+    name: 'HTML Clip',
+    maintainers: ['EthanWng97'],
+    handler,
+};
+
+async function handler(ctx) {
     const type = 'html';
     const user = ctx.req.param('user');
     const tag = ctx.req.param('tag');
@@ -18,7 +29,7 @@ export default async (ctx) => {
     const $ = load(data);
     const entries = $('#snip_body>.article_content');
 
-    ctx.set('data', {
+    return {
         title: $('.header_text').text().trim(),
         link: currentUrl,
         item: entries
@@ -41,5 +52,5 @@ export default async (ctx) => {
             })
             .get(),
         allowEmpty: true,
-    });
-};
+    };
+}

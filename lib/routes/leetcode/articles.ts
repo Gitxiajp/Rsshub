@@ -1,5 +1,6 @@
+import { Route } from '@/types';
 import cache from '@/utils/cache';
-import got from '@/utils/got';
+import ofetch from '@/utils/ofetch';
 import { load } from 'cheerio';
 import { parseDate } from '@/utils/parse-date';
 import MarkdownIt from 'markdown-it';
@@ -11,10 +12,34 @@ const md = MarkdownIt({
 const host = 'https://leetcode.com';
 const gqlEndpoint = `${host}/graphql`;
 
-export default async (ctx) => {
+export const route: Route = {
+    path: '/articles',
+    categories: ['programming'],
+    example: '/leetcode/articles',
+    parameters: {},
+    features: {
+        requireConfig: false,
+        requirePuppeteer: false,
+        antiCrawler: false,
+        supportBT: false,
+        supportPodcast: false,
+        supportScihub: false,
+    },
+    radar: [
+        {
+            source: ['leetcode.com/articles'],
+        },
+    ],
+    name: 'Articles',
+    maintainers: ['LogicJake'],
+    handler,
+    url: 'leetcode.com/articles',
+};
+
+async function handler() {
     const link = new URL('/articles/', host).href;
-    const response = await got(link);
-    const $ = load(response.data);
+    const response = await ofetch(link, { parseResponse: (txt) => txt });
+    const $ = load(response);
 
     const list = $('a.list-group-item')
         .filter((i, e) => $(e).find('h4.media-heading i').length === 0)
@@ -34,37 +59,35 @@ export default async (ctx) => {
             cache.tryGet(info.link, async () => {
                 const titleSlug = info.link.split('/')[4];
 
-                const questionContent = await got
-                    .post(gqlEndpoint, {
-                        json: {
-                            operationName: 'questionContent',
-                            variables: { titleSlug },
-                            query: `query questionContent($titleSlug: String!) {
+                const questionContent = await ofetch(gqlEndpoint, {
+                    method: 'POST',
+                    body: {
+                        operationName: 'questionContent',
+                        variables: { titleSlug },
+                        query: `query questionContent($titleSlug: String!) {
                                 question(titleSlug: $titleSlug) {
                                     content
                                     mysqlSchemas
                                     dataSchemas
                                 }
                             }`,
-                        },
-                    })
-                    .json();
+                    },
+                });
 
-                const officialSolution = await got
-                    .post(gqlEndpoint, {
-                        json: {
-                            operationName: 'officialSolution',
-                            variables: { titleSlug },
-                            query: `query officialSolution($titleSlug: String!) {
+                const officialSolution = await ofetch(gqlEndpoint, {
+                    method: 'POST',
+                    body: {
+                        operationName: 'officialSolution',
+                        variables: { titleSlug },
+                        query: `query officialSolution($titleSlug: String!) {
                                 question(titleSlug: $titleSlug) {
                                     solution {
                                         content
                                     }
                                 }
                             }`,
-                        },
-                    })
-                    .json();
+                    },
+                });
 
                 const solution = md.render(officialSolution.data.question.solution.content);
 
@@ -76,11 +99,11 @@ export default async (ctx) => {
         )
     );
 
-    ctx.set('data', {
+    return {
         title: $('head title').text(),
         description: $('meta[property="og:description"]').attr('content'),
         image: 'https://assets.leetcode.com/static_assets/public/icons/favicon-192x192.png',
         link,
         item: out,
-    });
-};
+    };
+}

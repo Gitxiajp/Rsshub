@@ -1,9 +1,45 @@
+import { Route, ViewType } from '@/types';
 import cache from '@/utils/cache';
 import got from '@/utils/got';
 import { load } from 'cheerio';
 import { parseDate } from '@/utils/parse-date';
 
-export default async (ctx) => {
+export const route: Route = {
+    path: '/:section?/:type?/:user?',
+    categories: ['programming', 'popular'],
+    view: ViewType.Articles,
+    example: '/hackernews/threads/comments_list/dang',
+    parameters: {
+        section: {
+            description: 'Content section, default to `index`',
+        },
+        type: {
+            description: 'Link type, default to `sources`',
+        },
+        user: {
+            description: 'Set user, only valid in `threads` and `submitted` sections',
+        },
+    },
+    features: {
+        requireConfig: false,
+        requirePuppeteer: false,
+        antiCrawler: false,
+        supportBT: false,
+        supportPodcast: false,
+        supportScihub: false,
+    },
+    radar: [
+        {
+            source: ['news.ycombinator.com/:section', 'news.ycombinator.com/'],
+        },
+    ],
+    name: 'User',
+    maintainers: ['nczitzk', 'xie-dongping'],
+    handler,
+    description: `Subscribe to the content of a specific user`,
+};
+
+async function handler(ctx) {
     const section = ctx.req.param('section') ?? 'index';
     const type = ctx.req.param('type') ?? 'sources';
     const user = ctx.req.param('user') ?? '';
@@ -105,9 +141,9 @@ export default async (ctx) => {
         )
     );
 
-    ctx.set('data', {
+    return {
         title: $('title').text(),
         link: currentUrl,
         item: items,
-    });
-};
+    };
+}

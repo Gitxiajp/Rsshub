@@ -1,8 +1,31 @@
+import { Route, ViewType } from '@/types';
 import got from '@/utils/got';
 import timezone from '@/utils/timezone';
 import { parseDate } from '@/utils/parse-date';
 
-export default async (ctx) => {
+export const route: Route = {
+    path: '/dailyselection',
+    name: 'Daily Selection',
+    categories: ['picture'],
+    view: ViewType.Pictures,
+    example: '/natgeo/dailyselection',
+    parameters: {},
+    features: {
+        requireConfig: false,
+        requirePuppeteer: false,
+        antiCrawler: false,
+        supportBT: false,
+    },
+    radar: [
+        {
+            source: ['nationalgeographic.com/'],
+        },
+    ],
+    maintainers: ['OrangeEd1t'],
+    handler,
+};
+
+async function handler() {
     const host = 'http://dili.bdatu.com/jiekou/mains/p1.html';
     const data = await got(host);
 
@@ -33,9 +56,9 @@ export default async (ctx) => {
         return info;
     });
 
-    ctx.set('data', {
+    return {
         title: 'Photo of the Daily Selection',
         link: api,
         item: out,
-    });
-};
+    };
+}

@@ -1,40 +1,65 @@
+import { Route } from '@/types';
 import { getCurrentPath } from '@/utils/helpers';
 const __dirname = getCurrentPath(import.meta.url);
 
 import got from '@/utils/got';
 import { parseDate } from '@/utils/parse-date';
 import { art } from '@/utils/render';
-import * as path from 'node:path';
+import path from 'node:path';
+import cache from '@/utils/cache';
+import { config } from '@/config';
 
-export default async (ctx) => {
+export const route: Route = {
+    path: '/music/djradio/:id/:info?',
+    categories: ['multimedia'],
+    example: '/163/music/djradio/347317067',
+    parameters: { id: '节目 id, 可在电台节目页 URL 中找到', info: '默认在正文尾部显示节目相关信息，任意值为不显示' },
+    features: {
+        requireConfig: false,
+        requirePuppeteer: false,
+        antiCrawler: false,
+        supportBT: false,
+        supportPodcast: true,
+        supportScihub: false,
+    },
+    name: '电台节目',
+    maintainers: ['magic-akari'],
+    handler,
+};
+
+const ProcessFeed = (id, limit, offset) =>
+    cache.tryGet(
+        `163:music:djradio:${id}:${limit}:${offset}`,
+        async () =>
+            await got.post('https://music.163.com/api/dj/program/byradio', {
+                headers: {
+                    Referer: 'https://music.163.com/',
+                },
+                form: {
+                    radioId: id,
+                    limit,
+                    offset,
+                },
+            }),
+        config.cache.routeExpire,
+        false
+    );
+
+async function handler(ctx) {
     const id = ctx.req.param('id');
+    const info = !ctx.req.param('info');
 
-    const ProcessFeed = (limit, offset) =>
-        got.post('https://music.163.com/api/dj/program/byradio', {
-            headers: {
-                Referer: 'https://music.163.com/',
-            },
-            form: {
-                radioId: id,
-                limit,
-                offset,
-            },
-        });
-
-    const response = await ProcessFeed(1, 0);
+    const response = await ProcessFeed(id, 1, 0);
 
     const programs = response.data.programs || [];
     const { radio, dj } = programs[0] || { radio: {}, dj: {} };
     const count = response.data.count || 0;
 
-    const countPage = [];
-    for (let i = 0; i < Math.ceil(count / 500); i++) {
-        countPage.push(i);
-    }
+    const countPage = Array.from({ length: Math.ceil(count / 500) }, (_, i) => i);
 
     const items = await Promise.all(
         countPage.map(async (item) => {
-            const response = await ProcessFeed(500, item * 500);
+            const response = await ProcessFeed(id, 500, item * 500);
             const programs = response.data.programs || [];
             const list = programs.map((pg) => {
                 const description = (pg.description || '').split('\n').map((p) => p);
@@ -45,6 +70,7 @@ export default async (ctx) => {
                     pg,
                     description,
                     itunes_duration: mm_ss_duration,
+                    info,
                 });
 
                 return {
@@ -65,7 +91,7 @@ export default async (ctx) => {
         })
     );
 
-    ctx.set('data', {
+    return {
         title: radio.name,
         link: `https://music.163.com/djradio?id=${id}`,
         subtitle: radio.desc,
@@ -77,5 +103,5 @@ export default async (ctx) => {
         itunes_author: dj.nickname,
         itunes_category: radio.category,
         item: items.flat(),
-    });
-};
+    };
+}

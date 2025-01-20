@@ -1,8 +1,10 @@
+import { Route, ViewType } from '@/types';
 import cache from '@/utils/cache';
 import { ig, login } from './utils';
 import logger from '@/utils/logger';
 import { config } from '@/config';
 import { renderItems } from '../common-utils';
+import InvalidParameterError from '@/errors/types/invalid-parameter';
 
 // loadContent pulls the desired user/tag/etc
 async function loadContent(category, nameOrId, tryGet) {
@@ -54,7 +56,56 @@ async function loadContent(category, nameOrId, tryGet) {
     };
 }
 
-export default async (ctx) => {
+export const route: Route = {
+    path: '/:category/:key',
+    categories: ['social-media'],
+    view: ViewType.SocialMedia,
+    example: '/instagram/user/stefaniejoosten',
+    parameters: {
+        category: {
+            description: 'Feed category',
+            default: 'user',
+            options: [
+                {
+                    label: 'User',
+                    value: 'user',
+                },
+                {
+                    label: 'Tags',
+                    value: 'tags',
+                },
+            ],
+        },
+        key: 'Username / Hashtag name',
+    },
+    features: {
+        requireConfig: [
+            {
+                name: 'IG_PROXY',
+                optional: true,
+                description: '',
+            },
+            {
+                name: 'IG_USERNAME',
+                description: 'Instagram username',
+            },
+            {
+                name: 'IG_PASSWORD',
+                description: 'Instagram password, due to [Instagram Private API](https://github.com/dilame/instagram-private-api) restrictions, you have to setup your credentials on the server. 2FA is not supported.',
+            },
+        ],
+        requirePuppeteer: false,
+        antiCrawler: true,
+        supportBT: false,
+        supportPodcast: false,
+        supportScihub: false,
+    },
+    name: 'User Profile / Hashtag - Private API',
+    maintainers: ['oppilate', 'DIYgod'],
+    handler,
+};
+
+async function handler(ctx) {
     // https://github.com/dilame/instagram-private-api#feeds
     // const availableCategories = ["accountFollowers", "accountFollowing", "news",
     //     "discover", "pendingFriendships", "blockedUsers", "directInbox", "directPending",
@@ -65,7 +116,7 @@ export default async (ctx) => {
     // e.g. username for user feed
     const { category, key } = ctx.req.param();
     if (!availableCategories.includes(category)) {
-        throw new Error('Such feed is not supported.');
+        throw new InvalidParameterError('Such feed is not supported.');
     }
 
     if (config.instagram && config.instagram.proxy) {
@@ -82,7 +133,7 @@ export default async (ctx) => {
         throw error;
     }
 
-    ctx.set('data', {
+    return {
         title: data.feedTitle,
         link: data.feedLink,
         description: data.feedDescription,
@@ -91,5 +142,5 @@ export default async (ctx) => {
         logo: data.feedLogo,
         image: data.feedLogo,
         allowEmpty: true,
-    });
-};
+    };
+}

@@ -1,3 +1,4 @@
+import { Route, ViewType } from '@/types';
 import cache from '@/utils/cache';
 import got from '@/utils/got';
 import parser from '@/utils/rss-parser';
@@ -5,7 +6,44 @@ import utils from './utils';
 import { load } from 'cheerio';
 import puppeteer from '@/utils/puppeteer';
 
-export default async (ctx) => {
+export const route: Route = {
+    path: '/:lang?',
+    categories: ['traditional-media', 'popular'],
+    view: ViewType.Articles,
+    example: '/nytimes/dual',
+    parameters: {
+        lang: {
+            description: 'language, default to Chinese',
+            options: [
+                { value: 'dual', label: 'Chinese-English' },
+                { value: 'en', label: 'English' },
+                { value: 'traditionalchinese', label: 'Traditional Chinese' },
+                { value: 'dual-traditionalchinese', label: 'Chinese-English (Traditional Chinese)' },
+            ],
+        },
+    },
+    features: {
+        requireConfig: false,
+        requirePuppeteer: false,
+        antiCrawler: false,
+        supportBT: false,
+        supportPodcast: false,
+        supportScihub: false,
+    },
+    radar: [
+        {
+            source: ['nytimes.com/'],
+            target: '',
+        },
+    ],
+    name: 'News',
+    maintainers: ['HenryQW', 'pseudoyu'],
+    handler,
+    url: 'nytimes.com/',
+    description: `By extracting the full text of articles, we provide a better reading experience (full text articles) over the official one.`,
+};
+
+async function handler(ctx) {
     let { lang = '' } = ctx.req.param();
     lang = lang.toLowerCase();
 
@@ -115,10 +153,10 @@ export default async (ctx) => {
 
     browser.close();
 
-    ctx.set('data', {
+    return {
         title,
         link: 'https://cn.nytimes.com',
         description: title,
         item: items,
-    });
-};
+    };
+}

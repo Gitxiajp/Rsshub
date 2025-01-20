@@ -1,9 +1,29 @@
+import { Route, ViewType } from '@/types';
 import got from '@/utils/got';
 import { load } from 'cheerio';
 import { parseDate } from '@/utils/parse-date';
 import timezone from '@/utils/timezone';
 
-export default async (ctx) => {
+export const route: Route = {
+    path: '/keyword/:keyword',
+    categories: ['shopping', 'popular'],
+    view: ViewType.Notifications,
+    example: '/smzdm/keyword/女装',
+    parameters: { keyword: '你想订阅的关键词' },
+    features: {
+        requireConfig: false,
+        requirePuppeteer: false,
+        antiCrawler: false,
+        supportBT: false,
+        supportPodcast: false,
+        supportScihub: false,
+    },
+    name: '关键词',
+    maintainers: ['DIYgod', 'MeanZhang'],
+    handler,
+};
+
+async function handler(ctx) {
     const keyword = ctx.req.param('keyword');
 
     const response = await got(`https://search.smzdm.com`, {
@@ -24,7 +44,7 @@ export default async (ctx) => {
     const $ = load(data);
     const list = $('.feed-row-wide');
 
-    ctx.set('data', {
+    return {
         title: `${keyword} - 什么值得买`,
         link: `https://search.smzdm.com/?c=home&s=${encodeURIComponent(keyword)}&order=time`,
         item:
@@ -38,5 +58,5 @@ export default async (ctx) => {
                     link: item.find('.feed-block-title a').attr('href'),
                 };
             }),
-    });
-};
+    };
+}

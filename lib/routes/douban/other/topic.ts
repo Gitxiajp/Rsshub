@@ -1,7 +1,26 @@
+import { Route } from '@/types';
 import cache from '@/utils/cache';
 import got from '@/utils/got';
 
-export default async (ctx) => {
+export const route: Route = {
+    path: '/topic/:id/:sort?',
+    categories: ['social-media', 'popular'],
+    example: '/douban/topic/48823',
+    parameters: { id: '话题id', sort: '排序方式，hot或new，默认为new' },
+    features: {
+        requireConfig: false,
+        requirePuppeteer: false,
+        antiCrawler: false,
+        supportBT: false,
+        supportPodcast: false,
+        supportScihub: false,
+    },
+    name: '话题',
+    maintainers: ['LogicJake', 'pseudoyu', 'haowenwu'],
+    handler,
+};
+
+async function handler(ctx) {
     const id = ctx.req.param('id');
     const sort = ctx.req.param('sort') || 'new';
 
@@ -17,8 +36,14 @@ export default async (ctx) => {
     });
 
     const data = response.data.items;
-    const title = data[0].topic.name;
-    const description = data[0].topic.introduction;
+
+    let title = id;
+    let description = '';
+
+    if (data[0].topic !== null) {
+        title = data[0].topic.name;
+        description = data[0].topic.introduction;
+    }
 
     const out = await Promise.all(
         data.map(async (item) => {
@@ -29,7 +54,7 @@ export default async (ctx) => {
             let link;
             let title;
             if (type === 'status') {
-                link = item.target.status.sharing_url.split('?')[0];
+                link = item.target.status.sharing_url.split('&')[0];
                 author = item.target.status.author.name;
                 title = author + '的广播';
                 date = item.target.status.create_time;
@@ -39,6 +64,19 @@ export default async (ctx) => {
                     let i;
                     for (i in images) {
                         description += `<br><img src="${images[i].normal.url}" />`;
+                    }
+                }
+            } else if (type === 'topic') {
+                link = item.target.sharing_url;
+                author = item.target.author.name;
+                title = item.target.title;
+                date = item.target.create_time;
+                description = item.target.abstract;
+                const images = item.target.photos;
+                if (images) {
+                    let i;
+                    for (i in images) {
+                        description += `<br><img src="${images[i].src}" />`;
                     }
                 }
             } else {
@@ -72,10 +110,10 @@ export default async (ctx) => {
         })
     );
 
-    ctx.set('data', {
+    return {
         title: `${title}-豆瓣话题`,
         description,
         link,
         item: out,
-    });
-};
+    };
+}

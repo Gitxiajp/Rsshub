@@ -1,9 +1,35 @@
+import { Route, ViewType } from '@/types';
 import got from '@/utils/got';
 import { load } from 'cheerio';
 import { parseDate } from '@/utils/parse-date';
 
-export default async (ctx) => {
-    const rootUrl = 'https://www.fastbull.cn';
+export const route: Route = {
+    path: '/express-news',
+    categories: ['finance', 'popular'],
+    view: ViewType.Articles,
+    example: '/fastbull/express-news',
+    parameters: {},
+    features: {
+        requireConfig: false,
+        requirePuppeteer: false,
+        antiCrawler: false,
+        supportBT: false,
+        supportPodcast: false,
+        supportScihub: false,
+    },
+    radar: [
+        {
+            source: ['fastbull.com/express-news', 'fastbull.com/'],
+        },
+    ],
+    name: 'News Flash',
+    maintainers: ['nczitzk'],
+    handler,
+    url: 'fastbull.com/express-news',
+};
+
+async function handler() {
+    const rootUrl = 'https://www.fastbull.com';
     const currentUrl = `${rootUrl}/express-news`;
 
     const response = await got({
@@ -25,9 +51,9 @@ export default async (ctx) => {
             };
         });
 
-    ctx.set('data', {
+    return {
         title: '实时财经快讯 - FastBull',
         link: currentUrl,
         item: items,
-    });
-};
+    };
+}

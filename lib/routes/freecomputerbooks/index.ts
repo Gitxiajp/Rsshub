@@ -1,13 +1,13 @@
+import { Route } from '@/types';
 import { getCurrentPath } from '@/utils/helpers';
 const __dirname = getCurrentPath(import.meta.url);
 
 import cache from '@/utils/cache';
 import { load } from 'cheerio';
-import * as path from 'node:path';
+import path from 'node:path';
 
 import got from '@/utils/got';
 import { art } from '@/utils/render';
-import { parseDate } from '@/utils/parse-date';
 
 const baseURL = 'https://freecomputerbooks.com/';
 
@@ -15,7 +15,35 @@ async function cheerioLoad(url) {
     return load((await got(url)).data);
 }
 
-export default async (ctx) => {
+export const route: Route = {
+    path: '/:category?',
+    name: 'Book List',
+    url: new URL(baseURL).host,
+    maintainers: ['cubroe'],
+    handler,
+    example: '/freecomputerbooks/compscAlgorithmBooks',
+    parameters: {
+        category: 'A category id., which should be the HTML file name (but **without** the `.html` suffix) in the URL path of a book list page.',
+    },
+    categories: ['reading'],
+    features: {
+        requireConfig: false,
+        requirePuppeteer: false,
+        antiCrawler: false,
+        supportRadar: true,
+        supportBT: false,
+        supportPodcast: false,
+        supportScihub: false,
+    },
+    radar: [
+        {
+            source: ['freecomputerbooks.com/', 'freecomputerbooks.com/index.html'],
+            target: '',
+        },
+    ],
+};
+
+async function handler(ctx) {
     const categoryId = ctx.req.param('category')?.trim();
     const requestURL = categoryId ? new URL(`${categoryId}.html`, baseURL).href : baseURL;
     const $ = await cheerioLoad(requestURL);
@@ -25,7 +53,7 @@ export default async (ctx) => {
     // Needing more robust processing if some day more such elements show up.
     const categoryTitle = $('.maintitlebar').text();
 
-    ctx.set('data', {
+    return {
         title: 'Free Computer Books - ' + categoryTitle,
         link: requestURL,
         description: $('title').text(),
@@ -37,8 +65,8 @@ export default async (ctx) => {
                 .toArray()
                 .map((elem) => buildPostItem($(elem), categoryTitle, cache))
         ),
-    });
-};
+    };
+}
 
 function buildPostItem(listItem, categoryTitle, cache) {
     const $ = load(''); // the only use below doesn't care about the content
@@ -59,15 +87,6 @@ function buildPostItem(listItem, categoryTitle, cache) {
                   .map((elem) => $(elem).text())
             : categoryTitle,
     };
-
-    const pubDateText = postInfo.find('span:last').text().replace(/^on /, '');
-    if (pubDateText) {
-        // Pretty much the same situation: Only a "Selected New Books" page has
-        // explicit publication dates for posts; even on each post's details
-        // page, there seems to be only the publication date for the book, but
-        // the post's creation date is still missing.
-        postItem.pubDate = parseDate(pubDateText);
-    }
 
     return cache.tryGet(postItem.link, () => insertDescriptionInto(postItem));
 }

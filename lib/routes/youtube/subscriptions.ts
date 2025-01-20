@@ -1,12 +1,51 @@
+import { Route } from '@/types';
 import cache from '@/utils/cache';
 import { config } from '@/config';
 import utils from './utils';
 import { parseDate } from '@/utils/parse-date';
 import asyncPool from 'tiny-async-pool';
+import ConfigNotFoundError from '@/errors/types/config-not-found';
 
-export default async (ctx) => {
+export const route: Route = {
+    path: '/subscriptions/:embed?',
+    categories: ['social-media'],
+    example: '/youtube/subscriptions',
+    parameters: { embed: 'Default to embed the video, set to any value to disable embedding' },
+    features: {
+        requireConfig: [
+            {
+                name: 'YOUTUBE_KEY',
+                description: '',
+            },
+            {
+                name: 'YOUTUBE_CLIENT_ID',
+                description: '',
+            },
+            {
+                name: 'YOUTUBE_CLIENT_SECRET',
+                description: '',
+            },
+            {
+                name: 'YOUTUBE_REFRESH_TOKEN',
+                description: '',
+            },
+        ],
+    },
+    radar: [
+        {
+            source: ['www.youtube.com/feed/subscriptions', 'www.youtube.com/feed/channels'],
+            target: '/subscriptions',
+        },
+    ],
+    name: 'Subscriptions',
+    maintainers: ['TonyRL'],
+    handler,
+    url: 'www.youtube.com/feed/subscriptions',
+};
+
+async function handler(ctx) {
     if (!config.youtube || !config.youtube.key || !config.youtube.clientId || !config.youtube.clientSecret || !config.youtube.refreshToken) {
-        throw new Error('YouTube RSS is disabled due to the lack of <a href="https://docs.rsshub.app/install/#pei-zhi-bu-fen-rss-mo-kuai-pei-zhi">relevant config</a>');
+        throw new ConfigNotFoundError('YouTube RSS is disabled due to the lack of <a href="https://docs.rsshub.app/deploy/config#route-specific-configurations">relevant config</a>');
     }
     const embed = !ctx.req.param('embed');
 
@@ -38,20 +77,21 @@ export default async (ctx) => {
                 pubDate: parseDate(snippet.publishedAt),
                 link: `https://www.youtube.com/watch?v=${videoId}`,
                 author: snippet.videoOwnerChannelTitle,
+                image: img.url,
             };
         });
 
-    ctx.set('data', {
+    const ret = {
         title: 'Subscriptions - YouTube',
         description: 'YouTube Subscriptions',
+        link: 'www.youtube.com/feed/subscriptions',
         item: items,
-    });
+    };
 
     ctx.set('json', {
-        title: 'Subscriptions - YouTube',
-        description: 'YouTube Subscriptions',
+        ...ret,
         channelIds,
         playlistIds,
-        item: items,
     });
-};
+    return ret;
+}

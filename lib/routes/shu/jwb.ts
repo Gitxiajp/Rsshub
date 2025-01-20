@@ -1,3 +1,4 @@
+import { Route } from '@/types';
 import cache from '@/utils/cache';
 import got from '@/utils/got';
 import { load } from 'cheerio';
@@ -7,10 +8,26 @@ const host = 'https://jwb.shu.edu.cn/';
 const alias = new Map([
     ['notice', 'tzgg'], // 通知公告
     ['news', 'xw'], // 新闻动态
-    ['policy', 'zcwj'], // 政策文件
+    /* ['policy', 'zcwj'],  政策文件 //BUG */
 ]);
 
-export default async (ctx) => {
+export const route: Route = {
+    path: ['/jwb/:type?'],
+    radar: [
+        {
+            source: ['www.shu.edu.cn/index'],
+            target: '/:type?',
+        },
+    ],
+    name: '教务部',
+    maintainers: ['tuxinghuan', 'GhhG123'],
+    handler,
+    description: `| 通知通告 | 新闻 | 政策文件(bug) |
+  | -------- | ---- | -------- |
+  | notice   | news | policy   |`,
+};
+
+async function handler(ctx) {
     const type = ctx.req.param('type') || 'notice';
     const link = `https://jwb.shu.edu.cn/index/${alias.get(type) || type}.htm`;
     const respond = await got.get(link);
@@ -38,9 +55,10 @@ export default async (ctx) => {
             })
         )
     );
-    ctx.set('data', {
+    return {
         title,
         link,
+        image: 'https://www.shu.edu.cn/__local/0/08/C6/1EABE492B0CF228A5564D6E6ABE_779D1EE3_5BF7.png',
         item: all,
-    });
-};
+    };
+}

@@ -1,7 +1,32 @@
+import { Route } from '@/types';
 import got from '@/utils/got';
 import { parseDate } from '@/utils/parse-date';
 
-export default async (ctx) => {
+export const route: Route = {
+    path: '/series/:id',
+    categories: ['new-media', 'popular'],
+    example: '/sspai/series/77',
+    parameters: { id: '专栏 id' },
+    features: {
+        requireConfig: false,
+        requirePuppeteer: false,
+        antiCrawler: false,
+        supportBT: false,
+        supportPodcast: false,
+        supportScihub: false,
+    },
+    radar: [
+        {
+            source: ['sspai.com/series/:id', 'sspai.com/series/:id/list', 'sspai.com/series/:id/metadata'],
+        },
+    ],
+    name: '付费专栏文章更新',
+    maintainers: ['TonyRL'],
+    handler,
+    url: 'sspai.com/series',
+};
+
+async function handler(ctx) {
     const id = ctx.req.param('id');
 
     const seriesInfo = await got.get(`https://sspai.com/api/v1/series/info/get?id=${id}&view=second`);
@@ -11,7 +36,7 @@ export default async (ctx) => {
         response.data.data.map(async (item) => {
             let description = '';
             if (item.probation) {
-                const res = await got(`https://sspai.com/api/v1/article/info/get?id=${item.id}&view=second`);
+                const res = await got(`https://sspai.com/api/v1/article/info/get?id=${item.id}&view=second&support_webp=true`);
                 description = res.data.data.body;
             } else {
                 description = `<img src="https://cdn.sspai.com/${item.banner}">`;
@@ -27,10 +52,10 @@ export default async (ctx) => {
         })
     );
 
-    ctx.set('data', {
+    return {
         title: `${seriesInfo.data.data.title} - 少数派`,
         description: `${seriesInfo.data.data.description} - 少数派`,
         link: `https://sspai.com/series/${id}`,
         item: items,
-    });
-};
+    };
+}

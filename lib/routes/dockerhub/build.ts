@@ -1,7 +1,34 @@
+import { Route, ViewType } from '@/types';
 import got from '@/utils/got';
 import { hash } from './utils';
 
-export default async (ctx) => {
+export const route: Route = {
+    path: '/build/:owner/:image/:tag?',
+    categories: ['program-update', 'popular'],
+    view: ViewType.Notifications,
+    example: '/dockerhub/build/diygod/rsshub/latest',
+    parameters: {
+        owner: 'Image owner, the owner of the official image fills in the library, for example: /dockerhub/build/library/mysql',
+        image: 'Image name',
+        tag: {
+            description: 'Image tag',
+            default: 'latest',
+        },
+    },
+    features: {
+        requireConfig: false,
+        requirePuppeteer: false,
+        antiCrawler: false,
+        supportBT: false,
+        supportPodcast: false,
+        supportScihub: false,
+    },
+    name: 'Image New Build',
+    maintainers: ['HenryQW'],
+    handler,
+};
+
+async function handler(ctx) {
     const { owner, image, tag = 'latest' } = ctx.req.param();
 
     const namespace = `${owner}/${image}`;
@@ -13,7 +40,7 @@ export default async (ctx) => {
 
     const item = data.data;
 
-    ctx.set('data', {
+    return {
         title: `${namespace}:${tag} build history`,
         description: metadata.data.description,
         link,
@@ -27,5 +54,5 @@ export default async (ctx) => {
                 guid: hash(item.images),
             },
         ],
-    });
-};
+    };
+}

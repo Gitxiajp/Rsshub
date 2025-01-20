@@ -1,9 +1,26 @@
+import { Route, ViewType } from '@/types';
 import got from '@/utils/got';
 import timezone from '@/utils/timezone';
 import { parseDate } from '@/utils/parse-date';
 import dayjs from 'dayjs';
 
-export default async (ctx) => {
+export const route: Route = {
+    path: '/express',
+    categories: ['finance', 'popular'],
+    view: ViewType.Articles,
+    example: '/techflowpost/express',
+    radar: [
+        {
+            source: ['techflowpost.com/newsletter/index.html'],
+        },
+    ],
+    name: '快讯',
+    maintainers: ['nczitzk'],
+    handler,
+    url: 'techflowpost.com/',
+};
+
+async function handler(ctx) {
     const rootUrl = 'https://www.techflowpost.com';
     const currentUrl = `${rootUrl}/newsletter/index.html`;
 
@@ -23,9 +40,9 @@ export default async (ctx) => {
         description: item.scontent,
     }));
 
-    ctx.set('data', {
+    return {
         title: '深潮TechFlow - 快讯',
         link: currentUrl,
         item: items,
-    });
-};
+    };
+}

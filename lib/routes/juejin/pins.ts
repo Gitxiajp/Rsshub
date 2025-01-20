@@ -1,7 +1,29 @@
-import got from '@/utils/got';
+import { Route } from '@/types';
+import ofetch from '@/utils/ofetch';
 import { parseDate } from '@/utils/parse-date';
 
-export default async (ctx) => {
+export const route: Route = {
+    path: '/pins/:type?',
+    categories: ['programming'],
+    example: '/juejin/pins/6824710202487472141',
+    parameters: { type: '默认为 recommend，见下表' },
+    features: {
+        requireConfig: false,
+        requirePuppeteer: false,
+        antiCrawler: false,
+        supportBT: false,
+        supportPodcast: false,
+        supportScihub: false,
+    },
+    name: '沸点',
+    maintainers: ['xyqfer', 'laampui'],
+    handler,
+    description: `| 推荐      | 热门 | 上班摸鱼            | 内推招聘            | 一图胜千言          | 今天学到了          | 每天一道算法题      | 开发工具推荐        | 树洞一下            |
+  | --------- | ---- | ------------------- | ------------------- | ------------------- | ------------------- | ------------------- | ------------------- | ------------------- |
+  | recommend | hot  | 6824710203301167112 | 6819970850532360206 | 6824710202487472141 | 6824710202562969614 | 6824710202378436621 | 6824710202000932877 | 6824710203112423437 |`,
+};
+
+async function handler(ctx) {
     const type = ctx.req.param('type') ?? 'recommend';
     const title = {
         recommend: '推荐',
@@ -16,7 +38,7 @@ export default async (ctx) => {
     };
 
     let url = '';
-    let json = null;
+    let json = {};
     if (/^\d+$/.test(type)) {
         url = `https://api.juejin.cn/recommend_api/v1/short_msg/topic`;
         json = { id_type: 4, sort_type: 500, cursor: '0', limit: 20, topic_id: type };
@@ -25,10 +47,9 @@ export default async (ctx) => {
         json = { id_type: 4, sort_type: 200, cursor: '0', limit: 20 };
     }
 
-    const response = await got({
-        method: 'post',
-        url,
-        json,
+    const response = await ofetch(url, {
+        method: 'POST',
+        body: json,
     });
 
     const items = response.data.data.map((item) => {
@@ -59,9 +80,9 @@ export default async (ctx) => {
         };
     });
 
-    ctx.set('data', {
+    return {
         title: `沸点 - ${title[type]}`,
         link: 'https://juejin.cn/pins/recommended',
         item: items,
-    });
-};
+    };
+}

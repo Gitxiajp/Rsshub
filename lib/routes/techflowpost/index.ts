@@ -1,8 +1,25 @@
+import { Route, ViewType } from '@/types';
 import got from '@/utils/got';
 import timezone from '@/utils/timezone';
 import { parseDate } from '@/utils/parse-date';
 
-export default async (ctx) => {
+export const route: Route = {
+    path: '/',
+    example: '/techflowpost',
+    radar: [
+        {
+            source: ['techflowpost.com/'],
+        },
+    ],
+    name: '首页',
+    categories: ['finance', 'popular'],
+    view: ViewType.Articles,
+    maintainers: ['nczitzk'],
+    handler,
+    url: 'techflowpost.com/',
+};
+
+async function handler(ctx) {
     const rootUrl = 'https://www.techflowpost.com';
 
     const { data: response } = await got.post('https://www.techflowpost.com/ashx/index.ashx', {
@@ -22,9 +39,9 @@ export default async (ctx) => {
         description: item.scontent,
     }));
 
-    ctx.set('data', {
+    return {
         title: '深潮TechFlow',
         link: rootUrl,
         item: items,
-    });
-};
+    };
+}

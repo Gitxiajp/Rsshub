@@ -1,17 +1,18 @@
+import { Route, ViewType } from '@/types';
 import { load } from 'cheerio';
-import got from '@/utils/got';
+import ofetch from '@/utils/ofetch';
 import rssParser from '@/utils/rss-parser';
 import { asyncPoolAll, parseArticle } from './utils';
 
 const parseAuthorNewsList = async (slug) => {
     const baseURL = `https://www.bloomberg.com/authors/${slug}`;
     const apiUrl = `https://www.bloomberg.com/lineup/api/lazy_load_author_stories?slug=${slug}&authorType=default&page=1`;
-    const resp = await got(apiUrl);
+    const resp = await ofetch(apiUrl);
     // Likely rate limited
-    if (!resp.data.html) {
+    if (!resp.html) {
         return [];
     }
-    const $ = load(resp.data.html);
+    const $ = load(resp.html);
     const articles = $('article.story-list-story');
     return articles
         .map((index, item) => {
@@ -27,7 +28,32 @@ const parseAuthorNewsList = async (slug) => {
         .get();
 };
 
-export default async (ctx) => {
+export const route: Route = {
+    path: '/authors/:id/:slug/:source?',
+    categories: ['finance', 'popular'],
+    view: ViewType.Articles,
+    example: '/bloomberg/authors/ARbTQlRLRjE/matthew-s-levine',
+    parameters: { id: 'Author ID, can be found in URL', slug: 'Author Slug, can be found in URL', source: 'Data source, either `api` or `rss`,`api` by default' },
+    features: {
+        requireConfig: false,
+        requirePuppeteer: false,
+        antiCrawler: true,
+        supportBT: false,
+        supportPodcast: false,
+        supportScihub: false,
+    },
+    radar: [
+        {
+            source: ['www.bloomberg.com/*/authors/:id/:slug', 'www.bloomberg.com/authors/:id/:slug'],
+            target: '/authors/:id/:slug',
+        },
+    ],
+    name: 'Authors',
+    maintainers: ['josh', 'pseudoyu'],
+    handler,
+};
+
+async function handler(ctx) {
     const { id, slug, source } = ctx.req.param();
     const link = `https://www.bloomberg.com/authors/${id}/${slug}`;
 
@@ -41,12 +67,12 @@ export default async (ctx) => {
     }
 
     const item = await asyncPoolAll(1, list, (item) => parseArticle(item));
-    const authorName = item.find((i) => i.author)?.author ?? 'Unknown';
+    const authorName = item.find((i) => i.author)?.author ?? slug;
 
-    ctx.set('data', {
+    return {
         title: `Bloomberg - ${authorName}`,
         link,
         language: 'en-us',
         item,
-    });
-};
+    };
+}

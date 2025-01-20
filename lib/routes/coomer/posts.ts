@@ -1,7 +1,32 @@
+import { Route } from '@/types';
 import fetchItems from './utils';
 
-export default async (ctx) => {
+export const route: Route = {
+    path: '/posts',
+    categories: ['multimedia'],
+    example: '/coomer/posts',
+    parameters: {},
+    features: {
+        requireConfig: false,
+        requirePuppeteer: false,
+        antiCrawler: false,
+        supportBT: false,
+        supportPodcast: false,
+        supportScihub: false,
+    },
+    radar: [
+        {
+            source: ['coomer.su/posts', 'coomer.su/'],
+        },
+    ],
+    name: 'Recent Posts',
+    maintainers: ['nczitzk'],
+    handler,
+    url: 'coomer.su/posts',
+};
+
+async function handler(ctx) {
     const currentUrl = 'posts';
 
-    ctx.set('data', await fetchItems(ctx, currentUrl));
-};
+    return await fetchItems(ctx, currentUrl);
+}

@@ -1,21 +1,39 @@
+import { Route } from '@/types';
 import cache from '@/utils/cache';
 import { load } from 'cheerio';
-import got from '@/utils/got';
+import ofetch from '@/utils/ofetch';
 import logger from '@/utils/logger';
 import timezone from '@/utils/timezone';
 import { parseDate } from '@/utils/parse-date';
 
-export default async (ctx) => {
+export const route: Route = {
+    path: '/topic/:id',
+    categories: ['programming'],
+    example: '/modb/topic/44158',
+    parameters: { id: '合辑序号' },
+    features: {
+        requireConfig: false,
+        requirePuppeteer: false,
+        antiCrawler: false,
+        supportBT: false,
+        supportPodcast: false,
+        supportScihub: false,
+    },
+    name: '合辑',
+    maintainers: ['yueneiqi'],
+    handler,
+};
+
+async function handler(ctx) {
     const baseUrl = 'https://www.modb.pro';
     const topicId = ctx.req.param('id');
-    const response = await got({
-        url: `${baseUrl}/api/columns/getKnowledge`,
-        searchParams: {
+    const response = await ofetch(`${baseUrl}/api/columns/getKnowledge`, {
+        query: {
             pageNum: 1,
             pageSize: 20,
             columnId: topicId,
         },
-    }).json();
+    });
     const list = response.list.map((item) => {
         let doc = {};
         let baseLink = {};
@@ -44,7 +62,7 @@ export default async (ctx) => {
     const items = await Promise.all(
         list.map((item) =>
             cache.tryGet(item.link, async () => {
-                const { data: response } = await got(item.link);
+                const response = await ofetch(item.link);
                 const $ = load(response);
                 item.description = $('div.editor-content-styl.article-style').first().html();
                 return item;
@@ -52,9 +70,9 @@ export default async (ctx) => {
         )
     );
 
-    ctx.set('data', {
+    return {
         title: '墨天轮合辑',
         link: `${baseUrl}/topic/${topicId}`,
         item: items,
-    });
-};
+    };
+}

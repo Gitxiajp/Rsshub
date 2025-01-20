@@ -1,21 +1,60 @@
+import { Route } from '@/types';
 import cache from '@/utils/cache';
-import got from '@/utils/got';
+import ofetch from '@/utils/ofetch';
 import { load } from 'cheerio';
 import { parseDate } from '@/utils/parse-date';
 
-export default async (ctx) => {
-    const topic = ctx.req.param('topic') ?? 'leadership';
-    const type = ctx.req.param('type') ?? 'Latest';
+export const route: Route = {
+    path: '/topic/:topic?/:type?',
+    categories: ['new-media', 'popular'],
+    example: '/hbr/topic/Leadership/Popular',
+    parameters: {
+        topic: 'Topic, can be found in URL, Leadership by default',
+        type: {
+            description: 'Type, see below, Popular by default',
+            options: [
+                { value: 'Popular', label: 'Popular' },
+                { value: 'From the Store', label: 'From the Store' },
+                { value: 'For You', label: 'For You' },
+            ],
+            default: 'Popular',
+        },
+    },
+    features: {
+        requireConfig: false,
+        requirePuppeteer: false,
+        antiCrawler: false,
+        supportBT: false,
+        supportPodcast: false,
+        supportScihub: false,
+    },
+    radar: [
+        {
+            source: ['hbr.org/topic/:topic?', 'hbr.org/'],
+        },
+    ],
+    name: 'Topic',
+    maintainers: ['nczitzk', 'pseudoyu'],
+    handler,
+    description: `| POPULAR | FROM THE STORE | FOR YOU |
+  | ------- | -------------- | ------- |
+  | Popular | From the Store | For You |
+
+::: tip
+  Click here to view [All Topics](https://hbr.org/topics)
+:::`,
+};
+
+async function handler(ctx) {
+    const topic = ctx.req.param('topic') ?? 'Leadership';
+    const type = ctx.req.param('type') ?? 'Popular';
 
     const rootUrl = 'https://hbr.org';
     const currentUrl = `${rootUrl}/topic/${topic}`;
 
-    const response = await got({
-        method: 'get',
-        url: currentUrl,
-    });
+    const response = await ofetch(currentUrl);
 
-    const $ = load(response.data);
+    const $ = load(response);
 
     const list = $(`stream-content[data-stream-name="${type}"]`)
         .find('.stream-item')
@@ -34,12 +73,9 @@ export default async (ctx) => {
     const items = await Promise.all(
         list.map((item) =>
             cache.tryGet(item.link, async () => {
-                const detailResponse = await got({
-                    method: 'get',
-                    url: item.link,
-                });
+                const detailResponse = await ofetch(item.link);
 
-                const content = load(detailResponse.data);
+                const content = load(detailResponse);
 
                 item.description = content('.article-body, article[itemprop="description"]').html();
                 item.pubDate = parseDate(content('meta[property="article:published_time"]').attr('content'));
@@ -49,9 +85,9 @@ export default async (ctx) => {
         )
     );
 
-    ctx.set('data', {
+    return {
         title: `${$('title').eq(0).text()} - ${type}`,
         link: currentUrl,
         item: items,
-    });
-};
+    };
+}

@@ -1,11 +1,34 @@
-import cache from '@/utils/cache';
+import { Route } from '@/types';
 import { parseDate } from '@/utils/parse-date';
 import { getAccountByUsername, getTimelineByAccountId, parseDescription, baseUrl } from './utils';
 
-export default async (ctx) => {
+export const route: Route = {
+    path: '/user/:username',
+    categories: ['social-media'],
+    example: '/fansly/user/AeriGoMoo',
+    parameters: { username: 'User ID' },
+    features: {
+        requireConfig: false,
+        requirePuppeteer: false,
+        antiCrawler: false,
+        supportBT: false,
+        supportPodcast: false,
+        supportScihub: false,
+    },
+    radar: [
+        {
+            source: ['fansly.com/:username/posts', 'fansly.com/:username/media'],
+        },
+    ],
+    name: 'User Timeline',
+    maintainers: ['TonyRL'],
+    handler,
+};
+
+async function handler(ctx) {
     const username = ctx.req.param('username');
 
-    const account = await getAccountByUsername(username, cache.tryGet);
+    const account = await getAccountByUsername(username);
     const timeline = await getTimelineByAccountId(account.id);
 
     const items = timeline.posts.map((post) => ({
@@ -16,7 +39,7 @@ export default async (ctx) => {
         author: `${account.displayName ?? account.username} (@${account.username})`,
     }));
 
-    ctx.set('data', {
+    return {
         title: `${account.displayName ?? account.username} (@${account.username}) - Fansly`,
         link: `${baseUrl}/${account.username}`,
         description: account.about.replaceAll('\n', ' '),
@@ -26,5 +49,5 @@ export default async (ctx) => {
         language: 'en',
         allowEmpty: true,
         item: items,
-    });
-};
+    };
+}

@@ -1,3 +1,4 @@
+import { Route } from '@/types';
 import cache from '@/utils/cache';
 import got from '@/utils/got';
 import { load } from 'cheerio';
@@ -11,7 +12,28 @@ const types = {
     column: '?type=COLUMN&page=1',
 };
 
-export default async (ctx) => {
+export const route: Route = {
+    path: '/article/:type?',
+    categories: ['anime'],
+    example: '/ymgal/article',
+    parameters: { type: '文章类型' },
+    features: {
+        requireConfig: false,
+        requirePuppeteer: false,
+        antiCrawler: false,
+        supportBT: false,
+        supportPodcast: false,
+        supportScihub: false,
+    },
+    name: '文章',
+    maintainers: ['SunBK201'],
+    handler,
+    description: `| 全部文章 | 资讯 | 专栏   |
+  | -------- | ---- | ------ |
+  | all      | news | column |`,
+};
+
+async function handler(ctx) {
     const type = ctx.req.param('type') || 'all';
 
     const link = `${host}/co/topic/list` + types[type];
@@ -20,7 +42,7 @@ export default async (ctx) => {
         await Promise.all(
             Object.values(types).map(async (type) => {
                 const response = await got(`${host}/co/topic/list${type}`);
-                data.push(response.data.data);
+                data.push(...response.data.data);
             })
         );
         data = data.sort((a, b) => b.publishTime - a.publishTime).slice(0, 10);
@@ -53,10 +75,10 @@ export default async (ctx) => {
         info = '专栏';
     }
 
-    ctx.set('data', {
+    return {
         title: `月幕 Galgame - ${info}`,
         link: `${host}/co/article`,
         description: `月幕 Galgame - ${info}`,
         item: items,
-    });
-};
+    };
+}

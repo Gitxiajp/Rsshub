@@ -1,13 +1,37 @@
-import got from '@/utils/got';
+import { Route } from '@/types';
+import ofetch from '@/utils/ofetch';
 import { load } from 'cheerio';
 import { parseDate } from '@/utils/parse-date';
 
-export default async (ctx) => {
+export const route: Route = {
+    path: '/app/:appId/:appSlug?',
+    categories: ['program-update'],
+    example: '/macupdate/app/11942',
+    parameters: { appId: 'Application unique ID, can be found in URL', appSlug: 'Application slug, can be found in URL' },
+    features: {
+        requireConfig: false,
+        requirePuppeteer: false,
+        antiCrawler: false,
+        supportBT: false,
+        supportPodcast: false,
+        supportScihub: false,
+    },
+    radar: [
+        {
+            source: ['macupdate.com/app/mac/:appId/:appSlug'],
+        },
+    ],
+    name: 'Update',
+    maintainers: ['TonyRL'],
+    handler,
+};
+
+async function handler(ctx) {
     const { appId, appSlug } = ctx.req.param();
     const baseUrl = 'https://www.macupdate.com';
     const link = `${baseUrl}/app/mac/${appId}${appSlug ? `/${appSlug}` : ''}`;
 
-    const { data: response } = await got(link);
+    const response = await ofetch(link);
     const $ = load(response);
 
     const nextData = JSON.parse($('#__NEXT_DATA__').text());
@@ -15,7 +39,7 @@ export default async (ctx) => {
     const {
         asPath,
         appData: { data: appData },
-    } = nextData.props.initialProps.pageProps;
+    } = nextData.props.pageProps;
 
     const item = {
         title: `${appData.title} ${appData.version}`,
@@ -27,7 +51,7 @@ export default async (ctx) => {
         author: appData.developer.name,
     };
 
-    ctx.set('data', {
+    return {
         title: appData.title,
         description: appData.description,
         link: `${baseUrl}${asPath}`,
@@ -35,9 +59,5 @@ export default async (ctx) => {
         icon: appData.logo.source,
         item: [item],
         language: 'en',
-    });
-
-    ctx.set('json', {
-        pageProps: nextData.props.initialProps.pageProps,
-    });
-};
+    };
+}

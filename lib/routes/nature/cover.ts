@@ -1,3 +1,4 @@
+import { Route } from '@/types';
 import cache from '@/utils/cache';
 // The content is generateed by undocumentated API of nature journals
 // This router has **just** been tested in:
@@ -21,7 +22,32 @@ import { parseDate } from '@/utils/parse-date';
 import { baseUrl, journalMap } from './utils';
 import { CookieJar } from 'tough-cookie';
 
-export default async (ctx) => {
+export const route: Route = {
+    path: '/cover',
+    categories: ['journal'],
+    example: '/nature/cover',
+    parameters: {},
+    features: {
+        requireConfig: false,
+        requirePuppeteer: false,
+        antiCrawler: false,
+        supportBT: false,
+        supportPodcast: false,
+        supportScihub: false,
+    },
+    radar: [
+        {
+            source: ['nature.com/'],
+        },
+    ],
+    name: 'Cover Story',
+    maintainers: ['y9c', 'pseudoyu'],
+    handler,
+    url: 'nature.com/',
+    description: `Subscribe to the cover images of the Nature journals, and get the latest publication updates in time.`,
+};
+
+async function handler() {
     const cookieJar = new CookieJar();
 
     await got('https://www.nature.com', { cookieJar });
@@ -39,13 +65,15 @@ export default async (ctx) => {
                 const { id, name, link } = journal;
 
                 const response = await got(link, { cookieJar });
+                const $ = load(response.data);
 
+                const ogUrl = $('meta[property="og:url"]').attr('content');
                 const capturingRegex = /volumes\/(?<volume>\d+)\/issues\/(?<issue>\d+)/;
-                const { volume, issue } = response.url.match(capturingRegex).groups;
+                const { volume, issue } = ogUrl?.match(capturingRegex)?.groups ?? {};
+
                 const imageUrl = `https://media.springernature.com/full/springer-static/cover-hires/journal/${id}/${volume}/${issue}?as=webp`;
                 const contents = `<div align="center"><img src="${imageUrl}" alt="Volume ${volume} Issue ${issue}"></div>`;
 
-                const $ = load(response.data);
                 const date = $('title').text().split(',')[1].trim();
                 const issueDescription = $('div[data-test=issue-description]').html() ?? '';
 
@@ -59,10 +87,10 @@ export default async (ctx) => {
         )
     );
 
-    ctx.set('data', {
+    return {
         title: 'Nature Covers Story',
         description: 'Find out the cover story of some Nature journals.',
         link: baseUrl,
         item: out,
-    });
-};
+    };
+}

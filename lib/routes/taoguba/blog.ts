@@ -1,13 +1,34 @@
-import cache from '@/utils/cache';
+import { Route } from '@/types';
 import got from '@/utils/got';
 import { load } from 'cheerio';
-import timezone from '@/utils/timezone';
-import { parseDate } from '@/utils/parse-date';
+import { rootUrl, renderPostDetail } from './util';
 
-export default async (ctx) => {
+export const route: Route = {
+    path: '/blog/:id',
+    categories: ['finance'],
+    example: '/taoguba/blog/252069',
+    parameters: { id: '博客 id，可在对应博客页中找到' },
+    features: {
+        requireConfig: false,
+        requirePuppeteer: false,
+        antiCrawler: false,
+        supportBT: false,
+        supportPodcast: false,
+        supportScihub: false,
+    },
+    radar: [
+        {
+            source: ['tgb.cn/blog/:id', 'tgb.cn/'],
+        },
+    ],
+    name: '用户博客',
+    maintainers: ['nczitzk'],
+    handler,
+};
+
+async function handler(ctx) {
     const id = ctx.req.param('id');
 
-    const rootUrl = 'https://www.taoguba.com.cn';
     const currentUrl = `${rootUrl}/blog/${id}`;
 
     const response = await got({
@@ -27,59 +48,19 @@ export default async (ctx) => {
             const a = item.find('a').first();
 
             return {
-                title: a.text(),
+                title: a.text().trim(),
                 link: `${rootUrl}/${a.attr('href')}`,
                 author,
             };
         });
 
-    items = await Promise.all(
-        items.map((item) =>
-            cache.tryGet(item.link, async () => {
-                const detailResponse = await got({
-                    method: 'get',
-                    url: item.link,
-                });
-                if (detailResponse.url.startsWith('https://www.taoguba.com.cn/topic/transfer')) {
-                    item.description = '登录后查看完整文章';
-                    return item;
-                }
+    items = await Promise.all(items.map(async (item) => await renderPostDetail(item)));
 
-                const content = load(detailResponse.data);
-
-                content('#videoImg').remove();
-                content('img').each((_, img) => {
-                    if (img.attribs.src2) {
-                        img.attribs.src = img.attribs.src2;
-                        delete img.attribs.src2;
-                        delete img.attribs['data-original'];
-                    }
-                });
-
-                item.description = content('#first').html();
-                item.pubDate = timezone(
-                    parseDate(
-                        content('.article-data span')
-                            .eq(1)
-                            .text()
-                            .match(/\d{4}-\d{2}-\d{2} \d{2}:\d{2}/)
-                    ),
-                    +8
-                );
-                item.category = content('.article-topic-list span')
-                    .toArray()
-                    .map((item) => $(item).text().trim());
-
-                return item;
-            })
-        )
-    );
-
-    ctx.set('data', {
+    return {
         title: `淘股吧 - ${author}`,
         description: $('meta[http-equiv="description"]').attr('content'),
         image: $('meta[property="og:image"]').attr('content'),
         link: currentUrl,
         item: items,
-    });
-};
+    };
+}

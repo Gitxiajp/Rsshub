@@ -1,6 +1,8 @@
+import { Route, ViewType } from '@/types';
 import got from '@/utils/got';
 import { load } from 'cheerio';
 import { parseDate } from '@/utils/parse-date';
+import InvalidParameterError from '@/errors/types/invalid-parameter';
 
 const host = 'https://www.dlsite.com';
 const infos = {
@@ -49,18 +51,44 @@ const infos = {
     },
 };
 
-export default async (ctx) => {
+export const route: Route = {
+    path: '/new/:type',
+    categories: ['anime', 'popular'],
+    view: ViewType.Articles,
+    example: '/dlsite/new/home',
+    parameters: {
+        type: {
+            description: '类型',
+            options: Object.values(infos).map((info) => ({ value: info.type, label: info.name })),
+        },
+    },
+    features: {
+        requireConfig: false,
+        requirePuppeteer: false,
+        antiCrawler: false,
+        supportBT: false,
+        supportPodcast: false,
+        supportScihub: false,
+    },
+    name: 'Current Release',
+    maintainers: ['cssxsh'],
+    handler,
+    description: `| Doujin | Comics | PC Games | Doujin (R18) | Adult Comics | H Games | Otome | BL |
+  | ------ | ------ | -------- | ------------ | ------------ | ------- | ----- | -- |
+  | home   | comic  | soft     | maniax       | books        | pro     | girls | bl |`,
+};
+
+async function handler(ctx) {
     const info = infos[ctx.req.param('type')];
     // 判断参数是否合理
     if (info === undefined) {
-        throw new Error('不支持指定类型！');
+        throw new InvalidParameterError('不支持指定类型！');
     }
 
     const link = info.url.slice(1);
 
-    const response = await got(link, {
+    const response = await got(new URL(link, host), {
         method: 'GET',
-        prefixUrl: host,
     });
     const data = response.data;
     const $ = load(data);
@@ -98,11 +126,11 @@ export default async (ctx) => {
         return signle;
     });
 
-    ctx.set('data', {
+    return {
         title,
         link,
         description,
         language: 'ja-jp',
         item,
-    });
-};
+    };
+}

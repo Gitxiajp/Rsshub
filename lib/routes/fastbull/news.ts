@@ -1,3 +1,4 @@
+import { Route, ViewType } from '@/types';
 import { getCurrentPath } from '@/utils/helpers';
 const __dirname = getCurrentPath(import.meta.url);
 
@@ -6,11 +7,36 @@ import got from '@/utils/got';
 import { load } from 'cheerio';
 import { parseDate } from '@/utils/parse-date';
 import { art } from '@/utils/render';
-import * as path from 'node:path';
+import path from 'node:path';
 
-export default async (ctx) => {
-    const rootUrl = 'https://www.fastbull.cn';
-    const currentUrl = `${rootUrl}/news`;
+export const route: Route = {
+    path: '/news',
+    categories: ['finance', 'popular'],
+    view: ViewType.Articles,
+    example: '/fastbull/news',
+    parameters: {},
+    features: {
+        requireConfig: false,
+        requirePuppeteer: false,
+        antiCrawler: false,
+        supportBT: false,
+        supportPodcast: false,
+        supportScihub: false,
+    },
+    radar: [
+        {
+            source: ['fastbull.com/cn/news', 'fastbull.com/cn'],
+        },
+    ],
+    name: 'News',
+    maintainers: ['nczitzk'],
+    handler,
+    url: 'fastbull.com/news',
+};
+
+async function handler() {
+    const rootUrl = 'https://www.fastbull.com';
+    const currentUrl = `${rootUrl}/cn/news`;
 
     const response = await got({
         method: 'get',
@@ -53,9 +79,9 @@ export default async (ctx) => {
         )
     );
 
-    ctx.set('data', {
+    return {
         title: '财经头条、财经新闻、最新资讯 - FastBull',
         link: currentUrl,
         item: items,
-    });
-};
+    };
+}

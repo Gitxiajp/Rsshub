@@ -1,7 +1,26 @@
+import { Route } from '@/types';
 import { config } from '@/config';
 import Parser from 'rss-parser';
 
-export default async (ctx) => {
+export const route: Route = {
+    path: ['/search/:query?', '/user/:username?', '/user/:username/search/:query?', '/sukebei/search/:query?', '/sukebei/user/:username?', '/sukebei/user/:username/search/:query?'],
+    categories: ['multimedia'],
+    example: '/nyaa/search/psycho-pass',
+    parameters: { query: 'Search keyword' },
+    features: {
+        requireConfig: false,
+        requirePuppeteer: false,
+        antiCrawler: false,
+        supportBT: true,
+        supportPodcast: false,
+        supportScihub: false,
+    },
+    name: 'Search Result',
+    maintainers: ['Lava-Swimmer', 'noname1776', 'camera-2018'],
+    handler,
+};
+
+async function handler(ctx) {
     const parser = new Parser({
         customFields: {
             item: ['magnet', ['nyaa:infoHash', 'infoHash']],
@@ -13,7 +32,7 @@ export default async (ctx) => {
 
     const { query, username } = ctx.req.param();
 
-    const rootURL = ctx.routerPath.split('/')[1] === 'sukebei' ? 'https://sukebei.nyaa.si' : 'https://nyaa.si';
+    const rootURL = ctx.req.path.split('/')[2] === 'sukebei' ? 'https://sukebei.nyaa.si' : 'https://nyaa.si';
 
     let currentRSSURL = `${rootURL}/?page=rss`;
     let currentLink = `${rootURL}/`;
@@ -29,17 +48,16 @@ export default async (ctx) => {
     const feed = await parser.parseURL(currentRSSURL);
 
     feed.items.map((item) => {
-        item.link = item.guid;
         item.description = item.content;
         item.enclosure_url = `magnet:?xt=urn:btih:${item.infoHash}`;
         item.enclosure_type = 'application/x-bittorrent';
         return item;
     });
 
-    ctx.set('data', {
+    return {
         title: feed.title,
         link: currentLink,
         description: feed.description,
         item: feed.items,
-    });
-};
+    };
+}

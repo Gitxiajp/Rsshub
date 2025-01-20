@@ -4,13 +4,13 @@ const __dirname = getCurrentPath(import.meta.url);
 import got from '@/utils/got';
 import { art } from '@/utils/render';
 import { load } from 'cheerio';
-import * as path from 'node:path';
+import path from 'node:path';
 import utils from './utils';
 
 let baseTitle = '日本郵便';
 const baseUrl = 'https://trackings.post.japanpost.jp/services/srv/search/direct?';
 
-export default async (ctx) => {
+export async function track(ctx) {
     const reqCode = ctx.req.param('reqCode');
     const reqReqCode = 'reqCodeNo1=' + reqCode;
 
@@ -64,7 +64,7 @@ export default async (ctx) => {
     let lastItemTimeStamp;
     let tz;
 
-    ctx.set('data', {
+    return {
         title: `${baseTitle} ${reqCode} ${packageType}`,
         link,
         description: `${baseTitle} ${reqCode} ${packageType}`,
@@ -111,5 +111,5 @@ export default async (ctx) => {
                 };
             })
             .get(),
-    });
-};
+    };
+}

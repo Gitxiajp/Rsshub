@@ -1,3 +1,4 @@
+import { Route, ViewType } from '@/types';
 import { getCurrentPath } from '@/utils/helpers';
 const __dirname = getCurrentPath(import.meta.url);
 
@@ -6,9 +7,31 @@ import got from '@/utils/got';
 import { load } from 'cheerio';
 import { parseDate } from '@/utils/parse-date';
 import { art } from '@/utils/render';
-import * as path from 'node:path';
+import path from 'node:path';
 
-export default async (ctx) => {
+export const route: Route = {
+    path: '/category/:category/:staffpicks?',
+    categories: ['social-media', 'popular'],
+    view: ViewType.Videos,
+    example: '/vimeo/category/documentary/staffpicks',
+    parameters: {
+        category: 'Category name can get from url like `documentary` in [https://vimeo.com/categories/documentary/videos](https://vimeo.com/categories/documentary/videos) ',
+        staffpicks: 'type `staffpicks` to sort with staffpicks',
+    },
+    features: {
+        requireConfig: false,
+        requirePuppeteer: false,
+        antiCrawler: false,
+        supportBT: false,
+        supportPodcast: false,
+        supportScihub: false,
+    },
+    name: 'Category',
+    maintainers: ['MisteryMonster'],
+    handler,
+};
+
+async function handler(ctx) {
     const { category, staffpicks } = ctx.req.param();
 
     const categoryparams = category;
@@ -41,7 +64,7 @@ export default async (ctx) => {
     const vimeojs = response.data.data;
 
     const feedlink = `https://vimeo.com/categories/${category}/videos/sort:latest`;
-    const feedlinkstaffpicks = '?staffpicked=ture';
+    const feedlinkstaffpicks = '?staffpicked=true';
     const feedDescription = await cache.tryGet(feedlink + (staffpicks ? feedlinkstaffpicks : ''), async () => {
         const response = await got({
             url: feedlink + (staffpicks ? feedlinkstaffpicks : ''),
@@ -50,7 +73,7 @@ export default async (ctx) => {
         return description('meta[name="description"]').attr('content');
     });
 
-    ctx.set('data', {
+    return {
         title: `${feedtitle} | Vimeo category`,
         link: feedlink + (staffpicks ? feedlinkstaffpicks : ''),
         description: feedDescription,
@@ -64,5 +87,5 @@ export default async (ctx) => {
             link: item.link,
             author: item.user.name,
         })),
-    });
-};
+    };
+}

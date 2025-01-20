@@ -1,9 +1,11 @@
+import { Route, ViewType } from '@/types';
 import cache from '@/utils/cache';
 import { getToken } from './token';
 import getRanking from './api/get-ranking';
 import { config } from '@/config';
 import pixivUtils from './utils';
 import { parseDate } from '@/utils/parse-date';
+import ConfigNotFoundError from '@/errors/types/config-not-found';
 
 const titles = {
     day: 'pixiv 日排行',
@@ -56,9 +58,92 @@ const alias = {
     r18g: 'week_r18g',
 };
 
-export default async (ctx) => {
+export const route: Route = {
+    path: '/ranking/:mode/:date?',
+    categories: ['social-media', 'popular'],
+    view: ViewType.Pictures,
+    example: '/pixiv/ranking/week',
+    parameters: {
+        mode: {
+            description: 'rank type',
+            options: [
+                {
+                    value: 'day',
+                    label: 'daily rank',
+                },
+                {
+                    value: 'week',
+                    label: 'weekly rank',
+                },
+                {
+                    value: 'month',
+                    label: 'monthly rank',
+                },
+                {
+                    value: 'day_male',
+                    label: 'male rank',
+                },
+                {
+                    value: 'day_felame',
+                    label: 'female rank',
+                },
+                {
+                    value: 'day_ai',
+                    label: 'AI-generated work Rankings',
+                },
+                {
+                    value: 'week_original',
+                    label: 'original rank',
+                },
+                {
+                    value: 'week_rookie',
+                    label: 'rookie user rank',
+                },
+                {
+                    value: 'day_r18',
+                    label: 'R-18 daily rank',
+                },
+                {
+                    value: 'day_r18_ai',
+                    label: 'R-18 AI-generated work',
+                },
+                {
+                    value: 'day_male_r18',
+                    label: 'R-18 male rank',
+                },
+                {
+                    value: 'day_female_r18',
+                    label: 'R-18 female rank',
+                },
+                {
+                    value: 'week_r18',
+                    label: 'R-18 weekly rank',
+                },
+                {
+                    value: 'week_r18g',
+                    label: 'R-18G rank',
+                },
+            ],
+            default: 'day',
+        },
+        date: 'format: `2018-4-25`',
+    },
+    features: {
+        requireConfig: false,
+        requirePuppeteer: false,
+        antiCrawler: false,
+        supportBT: false,
+        supportPodcast: false,
+        supportScihub: false,
+    },
+    name: 'Rankings',
+    maintainers: ['EYHN'],
+    handler,
+};
+
+async function handler(ctx) {
     if (!config.pixiv || !config.pixiv.refreshToken) {
-        throw new Error('pixiv RSS is disabled due to the lack of <a href="https://docs.rsshub.app/install/#pei-zhi-bu-fen-rss-mo-kuai-pei-zhi">relevant config</a>');
+        throw new ConfigNotFoundError('pixiv RSS is disabled due to the lack of <a href="https://docs.rsshub.app/deploy/config#route-specific-configurations">relevant config</a>');
     }
 
     const mode = alias[ctx.req.param('mode')] ?? ctx.req.param('mode');
@@ -66,7 +151,7 @@ export default async (ctx) => {
 
     const token = await getToken(cache.tryGet);
     if (!token) {
-        throw new Error('pixiv not login');
+        throw new ConfigNotFoundError('pixiv not login');
     }
 
     const response = await getRanking(mode, ctx.req.param('date') && date, token);
@@ -75,7 +160,7 @@ export default async (ctx) => {
 
     const dateStr = `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日 `;
 
-    ctx.set('data', {
+    return {
         title: (ctx.req.param('date') ? dateStr : '') + titles[mode],
         link: links[mode],
         description: dateStr + titles[mode],
@@ -84,11 +169,17 @@ export default async (ctx) => {
             return {
                 title: `#${index + 1} ${illust.title}`,
                 pubDate: parseDate(illust.create_date),
-                description: `<p>画师：${illust.user.name} - 阅览数：${illust.total_view} - 收藏数：${illust.total_bookmarks}</p><br>${images.join('')}`,
+                description: `${illust.caption}<br><p>画师：${illust.user.name} - 阅览数：${illust.total_view} - 收藏数：${illust.total_bookmarks}</p><br>${images.join('')}`,
                 link: `https://www.pixiv.net/artworks/${illust.id}`,
-                author: illust.user.name,
+                author: [
+                    {
+                        name: illust.user.name,
+                        url: `https://www.pixiv.net/users/${illust.user.id}`,
+                        avatar: illust.user.profile_image_urls.medium,
+                    },
+                ],
                 category: illust.tags.map((tag) => tag.name),
             };
         }),
-    });
-};
+    };
+}

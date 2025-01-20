@@ -1,12 +1,37 @@
+import { Route } from '@/types';
 import got from '@/utils/got';
 import { finishArticleItem } from '@/utils/wechat-mp';
 import { load } from 'cheerio';
 import utils from './utils';
 import { config } from '@/config';
+import ConfigNotFoundError from '@/errors/types/config-not-found';
 
-export default async (ctx) => {
+export const route: Route = {
+    path: '/wechat/:wxid',
+    categories: ['social-media'],
+    example: '/newrank/wechat/chijiread',
+    parameters: { wxid: '微信号，若微信号与新榜信息不一致，以新榜为准' },
+    features: {
+        requireConfig: [
+            {
+                name: 'NEWRANK_COOKIE',
+                description: '',
+            },
+        ],
+        requirePuppeteer: false,
+        antiCrawler: true,
+        supportBT: false,
+        supportPodcast: false,
+        supportScihub: false,
+    },
+    name: '微信公众号',
+    maintainers: ['lessmoe', 'pseudoyu'],
+    handler,
+};
+
+async function handler(ctx) {
     if (!config.newrank || !config.newrank.cookie) {
-        throw new Error('newrank RSS is disabled due to the lack of <a href="https://docs.rsshub.app/install/#pei-zhi-bu-fen-rss-mo-kuai-pei-zhi">relevant config</a>');
+        throw new ConfigNotFoundError('newrank RSS is disabled due to the lack of <a href="https://docs.rsshub.app/deploy/config#route-specific-configurations">relevant config</a>');
     }
     const uid = ctx.req.param('wxid');
     const nonce = utils.random_nonce(9);
@@ -45,21 +70,26 @@ export default async (ctx) => {
             xyz: utils.decrypt_wechat_detail_xyz(uid, nonce),
         },
     });
+
     const name = response.data.value.user.name;
     const realTimeArticles = utils.flatten(response.data.value.realTimeArticles);
     const articles = utils.flatten(response.data.value.articles);
     const newArticles = [...realTimeArticles, ...articles];
+
     const items = newArticles.map((item) => ({
+        id: item.id,
         title: item.title,
         description: '',
         link: item.url,
         pubDate: item.publicTime,
     }));
+
+    // TODO: link is empty
     await Promise.all(items.map((item) => finishArticleItem(item)));
 
-    ctx.set('data', {
+    return {
         title: name + ' - 微信公众号',
         link: `https://www.newrank.cn/new/readDetial?account=${uid}`,
         item: items,
-    });
-};
+    };
+}
